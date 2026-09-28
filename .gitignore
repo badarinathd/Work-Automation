@@ -1,0 +1,24 @@
+# Environment files
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Build files
+dist/
+build/
+
+# Logs
+*.log
+
+
+# csv file
+*.csv
+
+*.json
+
+# Specific files
+config.local.json
+secrets.txt
+
