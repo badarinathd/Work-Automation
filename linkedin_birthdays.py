@@ -11,9 +11,9 @@ Steps:
   5. Open "Birthdays" and send wishes one by one
 
 Usage:
-  python3 linkedin_birthdays.py              # send wishes
+  python3 linkedin_birthdays.py              # send wishes (10 per run)
   python3 linkedin_birthdays.py --dry-run    # just list who would be wished (sends nothing)
-  python3 linkedin_birthdays.py --limit 5    # send at most 5 wishes
+  python3 linkedin_birthdays.py --limit 5    # send at most 5 wishes (--limit 0 = no limit)
   python3 linkedin_birthdays.py --include-recent   # also belated birthdays (can be 200+)
 
 One-time Chrome setting (lets this script click things in Chrome):
@@ -39,6 +39,9 @@ LINKEDIN_URL = "https://www.linkedin.com/feed/"
 MY_NETWORK_URL = "https://www.linkedin.com/mynetwork/"
 CATCH_UP_URL = "https://www.linkedin.com/mynetwork/catch-up/all/"
 BIRTHDAYS_URL = "https://www.linkedin.com/mynetwork/catch-up/birthday/"
+# Max people handled per run by every linkedin_* script (override with --limit N; 0 = no limit)
+DEFAULT_LIMIT = 10
+
 # {name} = full name, {suggestion} = LinkedIn's suggested text for that person
 # ("Wishing you a very happy birthday!" or "Happy belated birthday!")
 WISH_TEMPLATE = "Hi {name}, {suggestion_lc}"
@@ -167,8 +170,10 @@ function clickByText(texts){
 JS_NEXT_WISH = JS_HELPERS + r"""
 (function(skip, dryRun, todayOnly){
   const btns = [...document.querySelectorAll('button, a')].filter(visible);
+  let old = 0, total = 0;
   for (const b of btns) {
     const m = (b.getAttribute('aria-label') || '').match(/^Message (.+?):\s*(.*birthday.*)$/i);
+    if (m) total++;
     if (!m || skip.includes(m[1].trim())) continue;
     // Card text says "Celebrate X's birthday today" or "... recent birthday on Sep 25"
     let card = b, when = '';
@@ -178,14 +183,12 @@ JS_NEXT_WISH = JS_HELPERS + r"""
       const w = t.match(/birthday today|recent birthday on [A-Za-z]+ \d+/i);
       if (w) when = w[0].toLowerCase().startsWith('birthday today') ? 'today' : w[0].replace(/^recent birthday /i, '');
     }
-    if (todayOnly && when !== 'today') {
-      if (when) return JSON.stringify({found: false, reachedOld: true});
-      continue;
-    }
+    // Belated birthdays can appear above today's ones, so skip past them (don't stop)
+    if (todayOnly && when !== 'today') { if (when) old++; continue; }
     if (!dryRun) { b.scrollIntoView({block: 'center'}); b.click(); }
     return JSON.stringify({found: true, name: m[1].trim(), suggestion: m[2].trim(), when});
   }
-  return JSON.stringify({found: false});
+  return JSON.stringify({found: false, old, total});
 })(SKIP, DRY_RUN, TODAY_ONLY)
 """
 
@@ -339,12 +342,18 @@ def next_person(chrome, skip, dry_run, today_only):
     """Find (and click, unless dry run) the next birthday person not in skip."""
     code = (JS_NEXT_WISH.replace("SKIP", json.dumps(sorted(skip)))
             .replace("DRY_RUN", json.dumps(dry_run)).replace("TODAY_ONLY", json.dumps(today_only)))
+    last_total, unchanged = -1, 0
     for _ in range(15):  # the list loads as you scroll
         result = json.loads(chrome.js(code))
         if result["found"]:
             return result
-        if result.get("reachedOld"):
+        # Stop once we're well into older birthdays, or the list stops growing
+        if today_only and result.get("old", 0) >= 10:
             return None
+        unchanged = unchanged + 1 if result.get("total") == last_total else 0
+        if unchanged >= 2:
+            return None
+        last_total = result.get("total")
         chrome.js(JS_LOAD_MORE)
         time.sleep(2)
     return None
@@ -355,8 +364,9 @@ def send_wishes(chrome, dry_run, limit, today_only):
     skip = set(done_today)
     sent = 0
 
-    if done_today:
-        log(f"Already wished today: {', '.join(sorted(done_today))}")
+    linkedin_done = sorted(n for n in done_today if ":" not in n)   # "facebook:..." = Facebook
+    if linkedin_done:
+        log(f"Already wished today: {', '.join(linkedin_done)}")
 
     while limit is None or sent < limit:
         if not dry_run and "/catch-up/birthday" not in chrome.url():
@@ -402,13 +412,15 @@ def send_wishes(chrome, dry_run, limit, today_only):
         chrome.goto(BIRTHDAYS_URL)
         chrome.wait_loaded()
 
-    log(f"Done. Wishes sent this run: {sent}. Total wished today: {len(done_today)}.")
+    log(f"Done. Wishes sent this run: {sent}. "
+        f"Total LinkedIn wishes today: {sum(1 for n in done_today if ':' not in n)}.")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="only list who would be wished")
-    ap.add_argument("--limit", type=int, default=None, help="max wishes to send")
+    ap.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
+                    help=f"max wishes to send (default {DEFAULT_LIMIT}; 0 = no limit)")
     ap.add_argument("--include-recent", action="store_true",
                     help="also wish recent (belated) birthdays, not just today's")
     args = ap.parse_args()
@@ -429,7 +441,7 @@ def main():
                  "'Message' / 'Send'.\nTo send wishes automatically, enable in Chrome's "
                  "menu bar:\n  View > Developer > Allow JavaScript from Apple Events\n"
                  "then run this script again.")
-    send_wishes(chrome, args.dry_run, args.limit, today_only=not args.include_recent)
+    send_wishes(chrome, args.dry_run, args.limit or None, today_only=not args.include_recent)
 
 
 if __name__ == "__main__":

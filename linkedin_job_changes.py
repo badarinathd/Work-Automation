@@ -24,7 +24,7 @@ import sys
 import time
 from pathlib import Path
 
-from linkedin_birthdays import (CATCH_UP_URL, GMAIL_URL, JS_HELPERS, JS_LOAD_MORE, JS_MODAL_OPEN,
+from linkedin_birthdays import (DEFAULT_LIMIT, CATCH_UP_URL, GMAIL_URL, JS_HELPERS, JS_LOAD_MORE, JS_MODAL_OPEN,
                                 JS_SEND, LINKEDIN_URL, MY_NETWORK_URL, Chrome, human_pause, log)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -163,7 +163,8 @@ def send_congrats(chrome, cat, dry_run, limit):
 def main(cat=JOB_CHANGES, doc=__doc__):
     ap = argparse.ArgumentParser(description=doc, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="only list who would be messaged")
-    ap.add_argument("--limit", type=int, default=None, help="max messages to send")
+    ap.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
+                    help=f"max messages to send (default {DEFAULT_LIMIT}; 0 = no limit)")
     args = ap.parse_args()
 
     chrome = Chrome()
@@ -179,7 +180,7 @@ def main(cat=JOB_CHANGES, doc=__doc__):
         sys.exit("Enable in Chrome: View > Developer > Allow JavaScript from Apple Events")
 
     open_category(chrome, cat)
-    send_congrats(chrome, cat, args.dry_run, args.limit)
+    send_congrats(chrome, cat, args.dry_run, args.limit or None)
 
 
 if __name__ == "__main__":

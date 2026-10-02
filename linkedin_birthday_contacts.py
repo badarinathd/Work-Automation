@@ -16,13 +16,18 @@ Steps:
 
 The file stays on this laptop only; nothing is uploaded anywhere.
 
+Everyone checked today (with or without a phone) is remembered in
+birthday_contacts_checked.json, so the next run moves on to new people.
+
 Usage:
-  python3 linkedin_birthday_contacts.py
+  python3 linkedin_birthday_contacts.py              # check 10 profiles per run
+  python3 linkedin_birthday_contacts.py --limit 0    # check everyone
 
 Needs the same one-time Chrome setting as linkedin_birthdays.py:
   View > Developer > Allow JavaScript from Apple Events
 """
 
+import argparse
 import csv
 import datetime as dt
 import json
@@ -31,11 +36,12 @@ import sys
 import time
 from pathlib import Path
 
-from linkedin_birthdays import (BIRTHDAYS_URL, GMAIL_URL, JS_LOAD_MORE, LINKEDIN_URL, Chrome,
+from linkedin_birthdays import (DEFAULT_LIMIT, BIRTHDAYS_URL, GMAIL_URL, JS_LOAD_MORE, LINKEDIN_URL, Chrome,
                                 human_pause, log, open_birthdays)
 
 CONTACTS_CSV = Path(__file__).resolve().parent / f"linkedin_birthday_contacts_{dt.date.today().isoformat()}.csv"
 HEADER = ["Name", "LinkedIn Profile", "Phone Number"]
+CHECKED_LOG = Path(__file__).resolve().parent / "birthday_contacts_checked.json"
 
 # Today's birthday people with their profile links. A card is the largest block
 # around a profile link that still contains only that one person's /in/ link.
@@ -91,6 +97,20 @@ def clean_phone(phone):
     return re.sub(r"\s*\([A-Za-z ]+\)", "", phone).strip()
 
 
+def load_checked_today():
+    """Profiles already opened today, with or without a phone number."""
+    try:
+        data = json.loads(CHECKED_LOG.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {}
+    return data, set(data.get(dt.date.today().isoformat(), []))
+
+
+def mark_checked(data, profile):
+    data.setdefault(dt.date.today().isoformat(), []).append(profile)
+    CHECKED_LOG.write_text(json.dumps(data, indent=2))
+
+
 def saved_profiles():
     try:
         with CONTACTS_CSV.open() as f:
@@ -142,6 +162,11 @@ def today_profiles(chrome):
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
+                    help=f"max profiles to open this run (default {DEFAULT_LIMIT}; 0 = no limit)")
+    args = ap.parse_args()
+
     chrome = Chrome()
     log("Step 1: Opening Chrome (Badarinath Devarasetty profile) with Gmail...")
     chrome.open_profile_window(GMAIL_URL)
@@ -161,14 +186,18 @@ def main():
 
     people = today_profiles(chrome)
     log(f"Step 6: {len(people)} birthdays today. Checking Contact info for each...")
-    done = saved_profiles()
+    checked_data, checked = load_checked_today()
+    done = saved_profiles() | checked
+    todo = [p for p in people if p["profile"] not in done]
+    if args.limit:
+        todo = todo[:args.limit]
+    log(f"   {len(people) - len([p for p in people if p['profile'] not in done])} already checked today; "
+        f"checking {len(todo)} now.")
     saved = 0
-    for p in people:
+    for p in todo:
         name, profile = p["name"], p["profile"]
-        if profile in done:
-            log(f" -  {name}: already in the file")
-            continue
         phone = read_phone(chrome, profile)
+        mark_checked(checked_data, profile)
         if not phone:
             log(f" -  {name}: no phone number")
             continue

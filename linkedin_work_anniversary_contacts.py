@@ -32,7 +32,7 @@ import time
 from pathlib import Path
 
 from linkedin_birthday_contacts import HEADER, read_phone
-from linkedin_birthdays import GMAIL_URL, JS_LOAD_MORE, LINKEDIN_URL, Chrome, human_pause, log
+from linkedin_birthdays import DEFAULT_LIMIT, GMAIL_URL, JS_LOAD_MORE, LINKEDIN_URL, Chrome, human_pause, log
 from linkedin_job_changes import open_category
 from linkedin_work_anniversaries import WORK_ANNIVERSARIES
 
@@ -101,7 +101,8 @@ def all_profiles(chrome, wanted):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--limit", type=int, default=None, help="max profiles to open this run")
+    ap.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
+                    help=f"max profiles to open this run (default {DEFAULT_LIMIT}; 0 = no limit)")
     args = ap.parse_args()
 
     chrome = Chrome()

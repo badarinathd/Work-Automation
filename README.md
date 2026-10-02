@@ -24,8 +24,8 @@ Press **Ctrl + C** to stop any script.
 | Script | What it does | Run |
 |---|---|---|
 | `linkedin_birthdays.py` | LinkedIn → My Network → Catch up → **Birthdays**. Messages everyone with a birthday **today**: *"Hi <Name>, wishing you a very happy birthday!"* | `python3 linkedin_birthdays.py` |
-| `linkedin_job_changes.py` | Catch up → **Job changes**. *"Hi <Name>, congrats on starting your new role at <Company>!"* | `python3 linkedin_job_changes.py --limit 20` |
-| `linkedin_work_anniversaries.py` | Catch up → **Work anniversaries**. *"Hi <Name>, congrats on your N year anniversary at <Company>!"* | `python3 linkedin_work_anniversaries.py --limit 20` |
+| `linkedin_job_changes.py` | Catch up → **Job changes**. *"Hi <Name>, congrats on starting your new role at <Company>!"* | `python3 linkedin_job_changes.py` |
+| `linkedin_work_anniversaries.py` | Catch up → **Work anniversaries**. *"Hi <Name>, congrats on your N year anniversary at <Company>!"* | `python3 linkedin_work_anniversaries.py` |
 | `linkedin_education.py` | Catch up → **Education**. *"Hi <Name>, congrats on finishing up at <School>!"* | `python3 linkedin_education.py` |
 | `facebook_birthdays.py` | facebook.com/events/birthdays. For **today's** birthdays, posts Facebook's suggested wish on their timeline, or sends a Messenger message if only "Message" is offered | `python3 facebook_birthdays.py` |
 | `whatsapp_from_sheet.py` | Reads the **"Send-Whatsapp-Birthday"** Google Sheet (tab "Mass message"). For each row with a Number (D) and Message (F), opens the chat in the **WhatsApp app** with *"Hi <Name>!,"* + message and presses Enter | `python3 whatsapp_from_sheet.py` |
@@ -35,7 +35,7 @@ Press **Ctrl + C** to stop any script.
 | Script | What it does | Run |
 |---|---|---|
 | `linkedin_birthday_contacts.py` | For **today's** LinkedIn birthdays: opens each profile in a new tab → **Contact info** → saves the phone number, if there is one, to `linkedin_birthday_contacts_<date>.csv` | `python3 linkedin_birthday_contacts.py` |
-| `linkedin_work_anniversary_contacts.py` | Same for the **Work anniversaries** list, saving to `linkedin_work_anniversary_contacts_<date>.csv`. Remembers who was already checked | `python3 linkedin_work_anniversary_contacts.py --limit 30` |
+| `linkedin_work_anniversary_contacts.py` | Same for the **Work anniversaries** list, saving to `linkedin_work_anniversary_contacts_<date>.csv`. Remembers who was already checked | `python3 linkedin_work_anniversary_contacts.py` |
 
 CSV format: `Name, LinkedIn Profile, Phone Number` (labels like "(Mobile)" removed).
 
@@ -50,11 +50,11 @@ CSV format: `Name, LinkedIn Profile, Phone Number` (labels like "(Mobile)" remov
 | Option | Meaning | Works with |
 |---|---|---|
 | `--dry-run` | Only show who would be messaged; send nothing | all greeting scripts |
-| `--limit N` | Send to / check at most N people | LinkedIn job changes, work anniversaries, education, birthdays, work-anniversary contacts |
+| `--limit N` | Send to / check at most N people. **Default is 10 per run** for every `linkedin_*` script; `--limit 0` = no limit | all `linkedin_*` scripts |
 | `--include-recent` | Also wish belated (recent) birthdays, not just today's | `linkedin_birthdays.py` |
 
-Tip: always try `--dry-run` first. For long lists (job changes, anniversaries),
-send about **20 a day** to stay clear of LinkedIn's limits.
+Tip: always try `--dry-run` first. LinkedIn scripts handle **10 people per run** by
+default (change `DEFAULT_LIMIT` in `linkedin_birthdays.py`); run again for the next 10.
 
 ## Record files (created by the scripts)
 
@@ -68,6 +68,7 @@ These stop anyone from being messaged twice. Deleting one lets a script message 
 | `education_wishes_sent.json` | Education |
 | `whatsapp_sent.json` | WhatsApp (same message never sent to the same number twice) |
 | `work_anniversary_contacts_checked.json` | Work-anniversary contacts (profiles already opened) |
+| `birthday_contacts_checked.json` | Birthday contacts (profiles already opened today) |
 | `linkedin_*_contacts_<date>.csv` | Saved phone numbers |
 
 ## Other files
